@@ -1,0 +1,44 @@
+# Git / IDE
+.git
+.gitignore
+.idea
+.vscode
+.cursor
+
+# Python
+.venv
+venv
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.dmypy.json
+.hypothesis
+
+# Build / dist
+build/
+dist/
+*.egg-info
+.eggs
+
+# Env (секреты не в образе)
+.env
+.env.*
+!.env.example
+
+# Тесты и прочее (не нужны рантайму)
+tests/
+htmlcov/
+.coverage
+coverage.xml
+
+# Документация и артефакты
+*.md
+!README.md
+
+# Прочее
+*.log
+.DS_Store
