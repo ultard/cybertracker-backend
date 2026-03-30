@@ -4,10 +4,12 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class PredictRequest(BaseModel):
+    tournament_id: int | None = None
+
+
 class PredictResponse(BaseModel):
     predicted_attendance: int = Field(description="Прогнозируемое число посетителей")
-    model_metrics: dict | None = None
-    recommendations: list[str] = Field(default_factory=list)
 
 
 class PredictionRead(BaseModel):
