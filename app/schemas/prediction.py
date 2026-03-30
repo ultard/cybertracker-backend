@@ -10,6 +10,14 @@ class PredictRequest(BaseModel):
 
 class PredictResponse(BaseModel):
     predicted_attendance: int = Field(description="Прогнозируемое число посетителей")
+    model_metrics: dict[str, float | None] | None = Field(
+        default=None,
+        description="Метрики качества модели (если посчитаны; при чистом инференсе обычно пусто)",
+    )
+    recommendations: list[str] = Field(
+        default_factory=list,
+        description="Краткие рекомендации по результатам прогноза",
+    )
 
 
 class PredictionRead(BaseModel):

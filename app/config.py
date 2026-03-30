@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
 
-    ai_model_path: str = "models/attendance_model.joblib"
+    ai_model_path: str = "models/xgboost_attendance.ubj"
     qr_token_ttl_seconds: int = 30
 
     postgres_host: str = "localhost"

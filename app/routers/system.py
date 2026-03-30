@@ -167,7 +167,7 @@ async def predict(
     registration_repository = RegistrationRepository(session)
     registered_count = await registration_repository.count_for_tournament(tournament_id)
     pred, metrics = predict_attendance(
-        discipline_id=tournament.discipline_id,
+        discipline_name=tournament.discipline.name,
         tournament_type=tournament.tournament_type,
         event_datetime=tournament.start_at,
         prize_pool=float(tournament.prize_pool),
