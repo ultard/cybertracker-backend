@@ -10,7 +10,6 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
-    Text,
     UniqueConstraint,
     func,
 )
@@ -26,7 +25,6 @@ _json_type = JSON().with_variant(JSONB, "postgresql")
 if TYPE_CHECKING:
     from app.models.discipline import Discipline
     from app.models.participant import Participant
-    from app.models.payment import Payment
     from app.models.system import AttendanceLog, QRSession
 
 
@@ -35,30 +33,31 @@ class Tournament(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+
     discipline_id: Mapped[int] = mapped_column(
         ForeignKey("disciplines.id", ondelete="RESTRICT"), index=True
     )
     tournament_type: Mapped[str] = mapped_column(
         String(32), default=TournamentType.offline.value, nullable=False, index=True
     )
-    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
     prize_pool: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     max_participants: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(
         String(32), default=TournamentStatus.draft.value, nullable=False, index=True
     )
-    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
-    payment_settings: Mapped[dict | None] = mapped_column(_json_type, nullable=True)
+
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
     discipline: Mapped[Discipline] = relationship(back_populates="tournaments")
     registrations: Mapped[list[Registration]] = relationship(back_populates="tournament")
     match_results: Mapped[list[MatchResult]] = relationship(back_populates="tournament")
-    payments: Mapped[list[Payment]] = relationship(back_populates="tournament")
     predictions: Mapped[list[AttendancePrediction]] = relationship(back_populates="tournament")
 
 
@@ -81,7 +80,6 @@ class Registration(Base):
     status: Mapped[str] = mapped_column(
         String(32), default=RegistrationStatus.pending.value, nullable=False, index=True
     )
-    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     participant: Mapped[Participant] = relationship(back_populates="registrations")
     tournament: Mapped[Tournament] = relationship(back_populates="registrations")
@@ -109,7 +107,6 @@ class MatchResult(Base):
         ForeignKey("registrations.id", ondelete="SET NULL"), nullable=True
     )
     score: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     tournament: Mapped[Tournament] = relationship(back_populates="match_results")
     winner_registration: Mapped[Registration | None] = relationship(

@@ -7,7 +7,6 @@ from app.openapi import (
     TAG_EMPLOYEES,
     TAG_MATCHES,
     TAG_PARTICIPANTS,
-    TAG_PAYMENTS,
     TAG_PREDICT,
     TAG_QR,
     TAG_REGISTRATIONS,
@@ -21,7 +20,6 @@ from app.routers import (
     employee,
     identity,
     participant,
-    payment,
     system,
     tournament,
 )
@@ -39,7 +37,6 @@ api_router.include_router(
 )
 api_router.include_router(tournament.matches_router, prefix="/matches", tags=[TAG_MATCHES])
 api_router.include_router(participant.router, prefix="/participants", tags=[TAG_PARTICIPANTS])
-api_router.include_router(payment.router, prefix="/payments", tags=[TAG_PAYMENTS])
 api_router.include_router(system.qr_router, prefix="/qr", tags=[TAG_QR])
 api_router.include_router(system.audit_router, prefix="/audit", tags=[TAG_AUDIT])
 api_router.include_router(system.predict_router, prefix="/predict", tags=[TAG_PREDICT])

@@ -1,25 +1,31 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class UserCreate(BaseModel):
-    login: str = Field(min_length=3, max_length=128, description="Уникальный логин")
+class BaseUser(BaseModel):
+    login: str
+    nickname: str | None
+
+    first_name: str | None
+    last_name: str | None
+
+    role_id: int
+
+
+class UserCreate(BaseUser):
     password: str = Field(min_length=6, max_length=128, description="Пароль")
-    role_id: int = Field(description="ID роли")
+    phone: str | None = Field(min_length=6, max_length=32, description="Номер телефона")
+    email: str | None = Field(min_length=6, max_length=255, description="Почта")
     is_active: bool = True
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(BaseUser):
     login: str | None = Field(default=None, min_length=3, max_length=128)
-    password: str | None = Field(default=None, min_length=6, max_length=128)
-    role_id: int | None = None
+    password: str | None = Field(default=None, min_length=6, max_length=128, description="Пароль")
     is_active: bool | None = None
 
 
-class UserRead(BaseModel):
+class UserRead(BaseUser):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    login: str
     is_active: bool
-    role_id: int
-    role_name: str | None = None

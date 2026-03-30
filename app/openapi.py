@@ -1,5 +1,3 @@
-"""Теги OpenAPI/Scalar. Имена используются в include_router(tags=[...]) и в openapi_tags."""
-
 TAG_AUTH = "Авторизация"
 TAG_USERS = "Пользователи"
 TAG_ROLES = "Роли"
@@ -7,7 +5,6 @@ TAG_DISCIPLINES = "Дисциплины"
 TAG_TOURNAMENTS = "Турниры"
 TAG_PARTICIPANTS = "Участники"
 TAG_REGISTRATIONS = "Регистрации"
-TAG_PAYMENTS = "Платежи"
 TAG_QR = "QR-коды"
 TAG_MATCHES = "Матчи"
 TAG_AUDIT = "Аудит"
@@ -22,7 +19,6 @@ OPENAPI_TAGS = [
     {"name": TAG_TOURNAMENTS, "description": "Турниры: создание, редактирование, активация."},
     {"name": TAG_PARTICIPANTS, "description": "Участники (игроки): профили, уровни."},
     {"name": TAG_REGISTRATIONS, "description": "Регистрации на турниры."},
-    {"name": TAG_PAYMENTS, "description": "Платежи за участие."},
     {"name": TAG_QR, "description": "Генерация и валидация QR-кодов для прохода на арену."},
     {"name": TAG_MATCHES, "description": "Результаты матчей."},
     {"name": TAG_AUDIT, "description": "Журнал аудита (действия пользователей)."},

@@ -28,20 +28,6 @@ class RegistrationStatus(StrEnum):
     cancelled = "cancelled"
 
 
-class PaymentStatus(StrEnum):
-    pending = "pending"
-    completed = "completed"
-    failed = "failed"
-    refunded = "refunded"
-
-
-class PaymentMethod(StrEnum):
-    cash = "cash"
-    card = "card"
-    online = "online"
-    other = "other"
-
-
 class ParticipantStatus(StrEnum):
     active = "active"
     blocked = "blocked"

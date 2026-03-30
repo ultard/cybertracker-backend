@@ -10,7 +10,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.config import get_settings
 from app.core.limiter import limiter
 from app.db.base import Base
-from app.db.seed import seed_admin, seed_levels, seed_roles
+from app.db.seed import seed_admin, seed_disciplines, seed_roles
 from app.db.session import async_session_factory, engine
 from app.openapi import OPENAPI_TAGS
 from app.routers import api_router
@@ -24,7 +24,7 @@ async def lifespan(_app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     async with async_session_factory() as session:
         await seed_roles(session)
-        await seed_levels(session)
+        await seed_disciplines(session)
         await seed_admin(session)
         await session.commit()
     yield
@@ -33,10 +33,7 @@ async def lifespan(_app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        description=(
-            "REST API для киберспорт-арены: турниры, регистрации, QR-проход, "
-            "прогноз посещаемости. Роли: admin, organizer, judge, manager, player, spectator."
-        ),
+        description=("REST API для киберспорт-арены."),
         version="0.1.0",
         openapi_tags=OPENAPI_TAGS,
         lifespan=lifespan,

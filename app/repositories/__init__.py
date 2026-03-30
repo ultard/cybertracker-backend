@@ -1,8 +1,7 @@
-from app.repositories.auth import RoleRepository, UserRepository
+from app.repositories.auth import RefreshSessionRepository, RoleRepository, UserRepository
 from app.repositories.discipline import DisciplineRepository
 from app.repositories.employee import EmployeeRepository
-from app.repositories.participant import ParticipantLevelRepository, ParticipantRepository
-from app.repositories.payment import PaymentRepository
+from app.repositories.participant import ParticipantRepository
 from app.repositories.system import AuditRepository, QRRepository
 from app.repositories.tournament import (
     AttendanceRepository,
@@ -18,12 +17,11 @@ __all__ = [
     "DisciplineRepository",
     "EmployeeRepository",
     "MatchRepository",
-    "ParticipantLevelRepository",
     "ParticipantRepository",
-    "PaymentRepository",
     "PredictionRepository",
     "QRRepository",
     "RegistrationRepository",
+    "RefreshSessionRepository",
     "RoleRepository",
     "TournamentRepository",
     "UserRepository",

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_service import write_audit
 from app.deps import get_current_user, get_db, require_roles
-from app.models import MatchResult, Registration, Tournament, User
+from app.models import MatchResult, Participant, Registration, Tournament, User
 from app.models.enums import RegistrationStatus, TournamentStatus, UserRoleName
 from app.repositories import (
     DisciplineRepository,
@@ -20,13 +20,13 @@ from app.schemas.match import MatchCreate, MatchRead, MatchUpdate
 from app.schemas.registration import RegistrationCreate, RegistrationRead, RegistrationUpdate
 from app.schemas.tournament import TournamentCreate, TournamentRead, TournamentUpdate
 
-# --- Tournaments router ---
-
 tournaments_router = APIRouter()
+
 Org = Annotated[
     User,
     Depends(require_roles(UserRoleName.admin, UserRoleName.organizer)),
 ]
+
 Reader = Annotated[
     User,
     Depends(
@@ -57,8 +57,6 @@ def _read_tournament(tournament: Tournament) -> TournamentRead:
         prize_pool=tournament.prize_pool,
         max_participants=tournament.max_participants,
         status=tournament.status,
-        comment=tournament.comment,
-        payment_settings=tournament.payment_settings,
         created_by_user_id=tournament.created_by_user_id,
         created_at=tournament.created_at,
     )
@@ -92,11 +90,7 @@ async def list_tournaments(
 
 
 @tournaments_router.post(
-    "",
-    response_model=TournamentRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создать турнир",
-    description="organizer или admin. discipline_id, название, статус, даты.",
+    "", response_model=TournamentRead, status_code=status.HTTP_201_CREATED, summary="Создать турнир"
 )
 async def create_tournament(
     user: Org,
@@ -117,8 +111,6 @@ async def create_tournament(
         prize_pool=data.prize_pool,
         max_participants=data.max_participants,
         status=data.status.value,
-        comment=data.comment,
-        payment_settings=data.payment_settings,
         created_by_user_id=user.id,
     )
     session.add(tournament)
@@ -192,10 +184,6 @@ async def update_tournament(
         tournament.max_participants = data.max_participants
     if data.status is not None:
         tournament.status = data.status.value
-    if data.comment is not None:
-        tournament.comment = data.comment
-    if data.payment_settings is not None:
-        tournament.payment_settings = data.payment_settings
     if tournament.end_at <= tournament.start_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid dates")
     await write_audit(
@@ -215,7 +203,7 @@ async def update_tournament(
     "/{tournament_id}/activate",
     response_model=TournamentRead,
     summary="Активировать турнир",
-    description="Переводит турнир в статус active. organizer или admin.",
+    description="Переводит турнир в статус active.",
 )
 async def activate_tournament(
     user: Org,
@@ -281,7 +269,7 @@ async def list_registrations(
         )
     my_participant = await participant_repository.get_by_user_id(user.id)
     if not my_participant:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        return Page(items=[], total=0, skip=skip, limit=limit)
     filtered_rows = [row for row in rows if row.participant_id == my_participant.id]
     return Page(
         items=[_read_registration(registration) for registration in filtered_rows],
@@ -341,17 +329,32 @@ async def create_registration(
         TournamentStatus.draft.value,
     ):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tournament not open")
+    participant_id = data.participant_id
     if user.role.name in (UserRoleName.player.value, UserRoleName.spectator.value):
         my_participant = await participant_repository.get_by_user_id(user.id)
-        if not my_participant or my_participant.id != data.participant_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        if my_participant:
+            participant_id = my_participant.id
+            if data.participant_id is not None and data.participant_id != participant_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
+        else:
+            participant = Participant(
+                user_id=user.id,
+                status="active",
+            )
+            session.add(participant)
+            await session.flush()
+            participant_id = participant.id
     elif user.role.name not in (UserRoleName.admin.value, UserRoleName.organizer.value):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
-    participant = await participant_repository.get_by_id(data.participant_id)
+    if participant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="participant_id required"
+        )
+    participant = await participant_repository.get_by_id(participant_id)
     if not participant:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="participant not found")
     if await registration_repository.get_by_participant_tournament(
-        data.participant_id, data.tournament_id
+        participant_id, data.tournament_id
     ):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already registered")
     count = await registration_repository.count_for_tournament(
@@ -360,10 +363,9 @@ async def create_registration(
     if count >= tournament.max_participants:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tournament is full")
     registration = Registration(
-        participant_id=data.participant_id,
+        participant_id=participant_id,
         tournament_id=data.tournament_id,
         status=data.status.value,
-        comment=data.comment,
     )
     session.add(registration)
     await session.flush()
@@ -384,7 +386,7 @@ async def create_registration(
     "/{registration_id}",
     response_model=RegistrationRead,
     summary="Обновить регистрацию",
-    description="Статус и комментарий. admin/organizer.",
+    description="Статус регистрации.",
 )
 async def update_registration(
     user: Annotated[User, Depends(require_roles(UserRoleName.admin, UserRoleName.organizer))],
@@ -398,8 +400,6 @@ async def update_registration(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
     if data.status is not None:
         registration.status = data.status.value
-    if data.comment is not None:
-        registration.comment = data.comment
     await write_audit(
         session,
         user_id=user.id,
@@ -440,9 +440,7 @@ async def list_matches(
     limit: int = Query(50, ge=1, le=200),
 ) -> Page[MatchRead]:
     match_repository = MatchRepository(session)
-    rows, total = await match_repository.list_for_tournament(
-        tournament_id, skip=skip, limit=limit
-    )
+    rows, total = await match_repository.list_for_tournament(tournament_id, skip=skip, limit=limit)
     return Page(
         items=[_read_match(match) for match in rows],
         total=total,

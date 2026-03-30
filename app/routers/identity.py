@@ -1,5 +1,3 @@
-"""Users и roles."""
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -29,18 +27,15 @@ def _read_user(user: User) -> UserRead:
     return UserRead(
         id=user.id,
         login=user.login,
+        nickname=user.nickname,
+        first_name=user.first_name,
+        last_name=user.last_name,
         is_active=user.is_active,
         role_id=user.role_id,
-        role_name=user.role.name if user.role else None,
     )
 
 
-@users_router.get(
-    "",
-    response_model=Page[UserRead],
-    summary="Список пользователей",
-    description="Пагинация. Фильтры: login, role_id, is_active. Только admin.",
-)
+@users_router.get("", response_model=Page[UserRead], summary="Список пользователей")
 async def list_users(
     _: AdminUser,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -67,7 +62,7 @@ async def list_users(
     response_model=UserRead,
     status_code=status.HTTP_201_CREATED,
     summary="Создать пользователя",
-    description="Логин и role_id обязательны. Только admin.",
+    description="Логин и role_id обязательны.",
 )
 async def create_user(
     _: AdminUser,
@@ -76,15 +71,23 @@ async def create_user(
 ) -> UserRead:
     user_repository = UserRepository(session)
     role_repository = RoleRepository(session)
+
     if await user_repository.get_by_login(data.login):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login exists")
+
     if not await role_repository.get_by_id(data.role_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role_id")
+
     user = User(
         login=data.login,
         password_hash=hash_password(data.password),
         is_active=data.is_active,
         role_id=data.role_id,
+        nickname=data.nickname,
+        first_name=data.first_name or "",
+        last_name=data.last_name or "",
+        phone=data.phone,
+        email=data.email,
     )
     session.add(user)
     await session.flush()
@@ -103,17 +106,14 @@ async def get_user(
 ) -> UserRead:
     user_repository = UserRepository(session)
     found_user = await user_repository.get_by_id(user_id)
+
     if not found_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
     return _read_user(found_user)
 
 
-@users_router.patch(
-    "/{user_id}",
-    response_model=UserRead,
-    summary="Обновить пользователя",
-    description="Частичное обновление: login, password, role_id, is_active. Только admin.",
-)
+@users_router.patch("/{user_id}", response_model=UserRead, summary="Обновить пользователя")
 async def update_user(
     _: AdminUser,
     user_id: int,
@@ -125,18 +125,29 @@ async def update_user(
     found_user = await user_repository.get_by_id(user_id)
     if not found_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    if data.login and data.login != found_user.login and await user_repository.get_by_login(data.login):
+
+    if (
+        data.login
+        and data.login != found_user.login
+        and await user_repository.get_by_login(data.login)
+    ):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login exists")
+
     if data.role_id is not None and not await role_repository.get_by_id(data.role_id):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role_id")
+
     if data.login is not None:
         found_user.login = data.login
+
     if data.password is not None:
         found_user.password_hash = hash_password(data.password)
+
     if data.role_id is not None:
         found_user.role_id = data.role_id
+
     if data.is_active is not None:
         found_user.is_active = data.is_active
+
     await write_audit(
         session, user_id=_.id, action="user.update", entity="User", entity_id=found_user.id
     )
@@ -158,8 +169,10 @@ async def delete_user(
 ) -> None:
     user_repository = UserRepository(session)
     found_user = await user_repository.get_by_id(user_id)
+
     if not found_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
     await write_audit(
         session, user_id=_.id, action="user.delete", entity="User", entity_id=found_user.id
     )
@@ -167,12 +180,7 @@ async def delete_user(
     await session.commit()
 
 
-@roles_router.get(
-    "",
-    response_model=list[RoleRead],
-    summary="Список ролей",
-    description="Роли системы. Только персонал.",
-)
+@roles_router.get("", response_model=list[RoleRead], summary="Список ролей")
 async def list_roles(
     _: Staff,
     session: Annotated[AsyncSession, Depends(get_db)],

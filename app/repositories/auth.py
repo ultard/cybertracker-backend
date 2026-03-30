@@ -1,10 +1,11 @@
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.models import Role, User
+from app.models import RefreshSession, Role, User
 from app.repositories.base import BaseRepository
 
 
@@ -57,3 +58,18 @@ class RoleRepository(BaseRepository):
 
     async def list_all(self) -> list[Role]:
         return await self._list_all(order_by=Role.id)
+
+
+class RefreshSessionRepository(BaseRepository):
+    model = RefreshSession
+
+    async def get_active_by_jti_hash(self, jti_hash: str) -> RefreshSession | None:
+        now = datetime.now(UTC)
+        result = await self.session.execute(
+            select(RefreshSession).where(
+                RefreshSession.jti_hash == jti_hash,
+                RefreshSession.revoked_at.is_(None),
+                RefreshSession.expires_at > now,
+            )
+        )
+        return result.scalar_one_or_none()

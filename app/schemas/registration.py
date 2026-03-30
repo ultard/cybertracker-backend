@@ -6,15 +6,13 @@ from app.models.enums import RegistrationStatus
 
 
 class RegistrationCreate(BaseModel):
-    participant_id: int = Field(description="ID участника")
+    participant_id: int | None = Field(default=None)
     tournament_id: int = Field(description="ID турнира")
     status: RegistrationStatus = RegistrationStatus.pending
-    comment: str | None = None
 
 
 class RegistrationUpdate(BaseModel):
     status: RegistrationStatus | None = None
-    comment: str | None = None
 
 
 class RegistrationRead(BaseModel):
@@ -25,4 +23,3 @@ class RegistrationRead(BaseModel):
     tournament_id: int
     registered_at: datetime | None
     status: str
-    comment: str | None

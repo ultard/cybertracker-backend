@@ -1,4 +1,8 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+from app.schemas.user import UserRead
 
 
 class LoginRequest(BaseModel):
@@ -17,3 +21,20 @@ class RegisterRequest(BaseModel):
 class TokenPayload(BaseModel):
     sub: str
     role: str | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str = Field(min_length=20)
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: int = Field(description="TTL access_token в секундах")
+    refresh_expires_in: int = Field(description="TTL refresh_token в секундах")
+    user: UserRead

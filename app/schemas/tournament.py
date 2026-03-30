@@ -15,8 +15,6 @@ class TournamentCreate(BaseModel):
     prize_pool: Decimal = Field(ge=0)
     max_participants: int = Field(ge=1, le=100000)
     status: TournamentStatus = TournamentStatus.draft
-    comment: str | None = None
-    payment_settings: dict | None = None
 
     @model_validator(mode="after")
     def end_after_start(self) -> TournamentCreate:
@@ -34,8 +32,6 @@ class TournamentUpdate(BaseModel):
     prize_pool: Decimal | None = Field(default=None, ge=0)
     max_participants: int | None = Field(default=None, ge=1, le=100000)
     status: TournamentStatus | None = None
-    comment: str | None = None
-    payment_settings: dict | None = None
 
 
 class TournamentRead(BaseModel):
@@ -51,7 +47,5 @@ class TournamentRead(BaseModel):
     prize_pool: Decimal
     max_participants: int
     status: str
-    comment: str | None
-    payment_settings: dict | None = None
     created_by_user_id: int | None = None
     created_at: datetime | None = None

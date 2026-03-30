@@ -1,5 +1,3 @@
-"""Аудит, QR, прогноз посещаемости."""
-
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated
@@ -17,12 +15,11 @@ from app.models import AttendanceLog, AttendancePrediction, QRSession, User
 from app.models.enums import UserRoleName
 from app.repositories import (
     ParticipantRepository,
-    PredictionRepository,
     QRRepository,
     RegistrationRepository,
     TournamentRepository,
 )
-from app.schemas.prediction import PredictionRead, PredictRequest, PredictResponse
+from app.schemas.prediction import PredictResponse
 from app.schemas.qr import QRGenerateResponse, QRValidateRequest, QRValidateResponse
 
 audit_router = APIRouter()
@@ -46,12 +43,7 @@ class AuditRead(BaseModel):
     changes: dict | None
 
 
-@audit_router.get(
-    "",
-    response_model=list[AuditRead],
-    summary="Журнал аудита",
-    description="Фильтры: entity, user_id. admin/manager.",
-)
+@audit_router.get("", response_model=list[AuditRead], summary="Журнал аудита")
 async def list_audit(
     _: Annotated[User, Depends(require_roles(UserRoleName.admin, UserRoleName.manager))],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -112,7 +104,7 @@ async def generate_qr(
     "/validate",
     response_model=QRValidateResponse,
     summary="Проверить QR и отметить посещение",
-    description="admin/organizer. Создаёт запись AttendanceLog.",
+    description="Создаёт запись AttendanceLog.",
 )
 async def validate_qr(
     user: Annotated[User, Depends(require_roles(UserRoleName.admin, UserRoleName.organizer))],
@@ -154,84 +146,59 @@ PredictUser = Annotated[
 
 
 @predict_router.post(
-    "",
+    "/tournament/{tournament_id}",
     response_model=PredictResponse,
     summary="Прогноз посещаемости",
-    description="Прогноз посещаемости по дисциплине, типу, дате, призу. admin/organizer/manager.",
+    description=(
+        "Прогноз по турниру"
+    ),
 )
 async def predict(
     user: PredictUser,
-    body: PredictRequest,
+    tournament_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PredictResponse:
     tournament_repository = TournamentRepository(session)
-    tournament = (
-        await tournament_repository.get_by_id(body.tournament_id)
-        if body.tournament_id
-        else None
-    )
-    if body.tournament_id and not tournament:
+    tournament = await tournament_repository.get_by_id(tournament_id)
+
+    if not tournament:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
+
     registration_repository = RegistrationRepository(session)
-    registered_count = body.registered_count
-    if body.tournament_id and tournament:
-        registered_count = await registration_repository.count_for_tournament(body.tournament_id)
+    registered_count = await registration_repository.count_for_tournament(tournament_id)
     pred, metrics = predict_attendance(
-        discipline_id=body.discipline_id,
-        tournament_type=body.tournament_type,
-        event_datetime=body.event_datetime,
-        prize_pool=float(body.prize_pool),
+        discipline_id=tournament.discipline_id,
+        tournament_type=tournament.tournament_type,
+        event_datetime=tournament.start_at,
+        prize_pool=float(tournament.prize_pool),
         registered_count=registered_count,
     )
     recs = recommendations(
         predicted=pred,
-        max_participants=(
-            tournament.max_participants if tournament else max(pred, 1)
-        ),
-        prize_pool=(
-            float(tournament.prize_pool) if tournament else float(body.prize_pool)
-        ),
+        max_participants=tournament.max_participants,
+        prize_pool=float(tournament.prize_pool),
     )
-    if body.tournament_id and tournament:
-        attendance_prediction = AttendancePrediction(
-            tournament_id=body.tournament_id,
-            predicted_attendance=pred,
-            actual_attendance=None,
-            mae=Decimal(str(metrics["mae"])) if metrics.get("mae") is not None else None,
-            rmse=Decimal(str(metrics["rmse"])) if metrics.get("rmse") is not None else None,
-            r2=Decimal(str(metrics["r2"])) if metrics.get("r2") is not None else None,
-        )
-        session.add(attendance_prediction)
-        await session.flush()
-        await write_audit(
-            session,
-            user_id=user.id,
-            action="predict.run",
-            entity="AttendancePrediction",
-            entity_id=attendance_prediction.id,
-        )
-        await session.commit()
+    attendance_prediction = AttendancePrediction(
+        tournament_id=tournament_id,
+        predicted_attendance=pred,
+        actual_attendance=None,
+        mae=Decimal(str(metrics["mae"])) if metrics.get("mae") is not None else None,
+        rmse=Decimal(str(metrics["rmse"])) if metrics.get("rmse") is not None else None,
+        r2=Decimal(str(metrics["r2"])) if metrics.get("r2") is not None else None,
+    )
+    session.add(attendance_prediction)
+    await session.flush()
+    await write_audit(
+        session,
+        user_id=user.id,
+        action="predict.run",
+        entity="AttendancePrediction",
+        entity_id=attendance_prediction.id,
+    )
+    await session.commit()
     return PredictResponse(
         predicted_attendance=pred,
         model_metrics=metrics or None,
         recommendations=recs,
     )
 
-
-@predict_router.get(
-    "/tournament/{tournament_id}",
-    response_model=list[PredictionRead],
-    summary="Прогнозы по турниру",
-)
-async def list_predictions(
-    _user: PredictUser,
-    tournament_id: int,
-    session: Annotated[AsyncSession, Depends(get_db)],
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-) -> list[PredictionRead]:
-    prediction_repository = PredictionRepository(session)
-    rows, _total = await prediction_repository.list_for_tournament(
-        tournament_id, skip=skip, limit=limit
-    )
-    return [PredictionRead.model_validate(prediction_row) for prediction_row in rows]

@@ -1,5 +1,3 @@
-"""Участники."""
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,14 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_service import write_audit
 from app.deps import get_current_user, get_db, require_roles
-from app.models import Participant, ParticipantLevel, User
+from app.models import Participant, User
 from app.models.enums import UserRoleName
-from app.repositories import ParticipantLevelRepository, ParticipantRepository, UserRepository
+from app.repositories import ParticipantRepository, UserRepository
 from app.schemas.common import Page
 from app.schemas.participant import (
     ParticipantCreate,
-    ParticipantLevelCreate,
-    ParticipantLevelRead,
     ParticipantRead,
     ParticipantUpdate,
 )
@@ -31,67 +27,19 @@ def _to_participant_read(participant: Participant) -> ParticipantRead:
 
 
 @router.get(
-    "/levels",
-    response_model=list[ParticipantLevelRead],
-    summary="Уровни участников",
-    description="Все уровни (разряды) участников. Для всех авторизованных.",
-)
-async def list_levels(
-    _: Annotated[User, Depends(get_current_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[ParticipantLevelRead]:
-    level_repository = ParticipantLevelRepository(session)
-    rows = await level_repository.list_all()
-    return [ParticipantLevelRead.model_validate(x) for x in rows]
-
-
-@router.post(
-    "/levels",
-    response_model=ParticipantLevelRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создать уровень",
-    description="Только admin.",
-)
-async def create_level(
-    _: Annotated[User, Depends(require_roles(UserRoleName.admin))],
-    data: ParticipantLevelCreate,
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> ParticipantLevelRead:
-    level = ParticipantLevel(
-        name=data.name, min_points=data.min_points, sort_order=data.sort_order
-    )
-    session.add(level)
-    await session.flush()
-    await write_audit(
-        session,
-        user_id=_.id,
-        action="level.create",
-        entity="ParticipantLevel",
-        entity_id=level.id,
-    )
-    await session.commit()
-    await session.refresh(level)
-    return ParticipantLevelRead.model_validate(level)
-
-
-@router.get(
     "",
     response_model=Page[ParticipantRead],
     summary="Список участников",
-    description="Пагинация. Фильтры: nickname, email. admin/organizer.",
+    description="Пагинация. admin/organizer.",
 )
 async def list_participants(
     _: AdminOrg,
     session: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=200),
-    nickname: str | None = None,
-    email: str | None = None,
 ) -> Page[ParticipantRead]:
     participant_repository = ParticipantRepository(session)
-    rows, total = await participant_repository.list_page(
-        skip=skip, limit=limit, nickname=nickname, email=email
-    )
+    rows, total = await participant_repository.list_page(skip=skip, limit=limit)
     return Page(
         items=[_to_participant_read(participant) for participant in rows],
         total=total,
@@ -118,16 +66,7 @@ async def create_participant(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user_id not found")
     participant = Participant(
         user_id=data.user_id,
-        level_id=data.level_id,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        patronymic=data.patronymic,
-        nickname=data.nickname,
-        birth_date=data.birth_date,
-        phone=data.phone,
-        email=data.email,
         status=data.status,
-        notes=data.notes,
     )
     session.add(participant)
     await session.flush()

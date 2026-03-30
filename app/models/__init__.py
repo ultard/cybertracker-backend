@@ -1,8 +1,7 @@
-from app.models.auth import Role, User
+from app.models.auth import RefreshSession, Role, User
 from app.models.discipline import Discipline
 from app.models.employee import Employee
-from app.models.participant import Participant, ParticipantLevel
-from app.models.payment import Payment
+from app.models.participant import Participant
 from app.models.system import AttendanceLog, AuditLog, QRSession
 from app.models.tournament import (
     AttendancePrediction,
@@ -19,11 +18,10 @@ __all__ = [
     "Employee",
     "MatchResult",
     "Participant",
-    "ParticipantLevel",
-    "Payment",
     "QRSession",
     "Registration",
     "Role",
+    "RefreshSession",
     "Tournament",
     "User",
 ]

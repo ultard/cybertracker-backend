@@ -1,5 +1,3 @@
-"""Сотрудники."""
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,12 +19,7 @@ def _to_employee_read(employee: Employee) -> EmployeeRead:
     return EmployeeRead.model_validate(employee)
 
 
-@router.get(
-    "",
-    response_model=Page[EmployeeRead],
-    summary="Список сотрудников",
-    description="Фильтр position. Только admin.",
-)
+@router.get("", response_model=Page[EmployeeRead], summary="Список сотрудников")
 async def list_employees(
     _: Admin,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -35,9 +28,7 @@ async def list_employees(
     position: str | None = None,
 ) -> Page[EmployeeRead]:
     employee_repository = EmployeeRepository(session)
-    rows, total = await employee_repository.list_page(
-        skip=skip, limit=limit, position=position
-    )
+    rows, total = await employee_repository.list_page(skip=skip, limit=limit, position=position)
     return Page(
         items=[_to_employee_read(employee) for employee in rows],
         total=total,

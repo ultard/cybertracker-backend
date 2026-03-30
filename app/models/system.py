@@ -25,6 +25,7 @@ class AuditLog(Base):
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
+
     action: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     entity: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)

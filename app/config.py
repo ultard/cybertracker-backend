@@ -1,6 +1,5 @@
 from enum import StrEnum
 from functools import lru_cache
-from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from yarl import URL
@@ -18,7 +17,7 @@ class LogLevel(StrEnum):
 
 
 class Settings(BaseSettings):
-    """Настройки приложения. Значения читаются из переменных окружения и `.env`."""
+    """Настройки приложения."""
 
     environment: str = "dev"
     log_level: LogLevel = LogLevel.INFO
@@ -33,11 +32,8 @@ class Settings(BaseSettings):
 
     jwt_secret_key: str = "change-me-in-production-use-long-random-string"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24
-
-    cookie_name: str = "access_token"
-    cookie_secure: bool = False
-    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
 
     ai_model_path: str = "models/attendance_model.joblib"
     qr_token_ttl_seconds: int = 30
