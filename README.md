@@ -17,6 +17,31 @@ REST API на **FastAPI** для киберспорт-арены: турниры
 | ReDoc         | http://127.0.0.1:8000/redoc |
 | OpenAPI JSON  | http://127.0.0.1:8000/openapi.json |
 
+## Структура кода
+
+Код в основном в `app/` и разнесён по слоям: **роутеры (HTTP) → зависимости (auth/roles/db) → репозитории (работа с БД) → модели/схемы**.
+
+- **`app/main.py`**: точка входа FastAPI — middleware, CORS, rate limit, подключение `api_router`, lifespan (инициализация таблиц и сиды).
+- **`app/config.py`**: настройки из `.env` (JWT, БД, CORS, AI-модель и т.д.).
+- **`app/routers/`**: HTTP-эндпоинты, валидация входа/выхода и права доступа.
+  - **`app/routers/__init__.py`**: сборка общего `api_router` и подключение под-роутеров (`/auth`, `/users`, `/tournaments`, `/qr`, `/predict` и т.д.).
+- **`app/deps.py`**: зависимости FastAPI (`get_db`, `get_current_user`, `require_roles`) — общий механизм авторизации/ролей для роутеров.
+- **`app/repositories/`**: слой доступа к данным (SQLAlchemy запросы, пагинация, поиск, CRUD).
+  - **`app/repositories/base.py`**: базовые методы (получение по id, пагинация).
+- **`app/models/`**: SQLAlchemy модели (таблицы) и перечисления (`enums.py`).
+- **`app/schemas/`**: Pydantic-схемы запросов/ответов.
+- **`app/db/`**: инфраструктура БД.
+  - **`app/db/session.py`**: engine + `AsyncSession` фабрика и выдача сессии.
+  - **`app/db/base.py`**: декларативная база моделей.
+  - **`app/db/seed.py`**: идемпотентные сиды (роли, дисциплины, admin).
+- **`app/core/`**: общие сервисы/утилиты.
+  - **`app/core/security.py`**: хеширование паролей, JWT access/refresh, decode/verify.
+  - **`app/core/audit_service.py`**: запись событий в аудит.
+  - **`app/core/limiter.py`**: rate limiter (SlowAPI).
+- **`app/ai/attendance.py`**: инференс XGBoost-модели и генерация рекомендаций (используется роутом `/api/predict/...`).
+- **`app/openapi.py`**: теги и описания для документации Scalar/OpenAPI/Swagger.
+- **`alembic/`**: миграции схемы БД.
+
 ## Конфигурация
 
 Параметры задаются переменными окружения и файлом **`.env`** (см. `.env.example`)
