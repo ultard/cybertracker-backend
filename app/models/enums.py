@@ -1,20 +1,21 @@
 from enum import StrEnum
 
 
-class UserRoleName(StrEnum):
+class UserRole(StrEnum):
     admin = "admin"
     organizer = "organizer"
-    judge = "judge"
     manager = "manager"
-    player = "player"
-    spectator = "spectator"
+    judge = "judge"
+    user = "user"
 
 
 class TournamentStatus(StrEnum):
     draft = "draft"
-    active = "active"
+    recruiting = "recruiting"
+    in_progress = "in_progress"
     completed = "completed"
     cancelled = "cancelled"
+    archived = "archived"
 
 
 class TournamentType(StrEnum):
@@ -22,12 +23,14 @@ class TournamentType(StrEnum):
     offline = "offline"
 
 
-class RegistrationStatus(StrEnum):
-    pending = "pending"
-    confirmed = "confirmed"
-    cancelled = "cancelled"
+class ParticipantRole(StrEnum):
+    player = "player"
+    spectator = "spectator"
 
 
 class ParticipantStatus(StrEnum):
-    active = "active"
-    blocked = "blocked"
+    pending = "pending"
+    confirmed = "confirmed"
+    disqualified = "disqualified"
+    banned = "banned"
+    cancelled = "cancelled"

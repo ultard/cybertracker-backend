@@ -12,11 +12,10 @@ from app.config import get_settings
 from app.core.audit_service import write_audit
 from app.deps import get_current_user, get_db, require_roles
 from app.models import AttendanceLog, AttendancePrediction, QRSession, User
-from app.models.enums import UserRoleName
+from app.models.enums import UserRole
 from app.repositories import (
     ParticipantRepository,
     QRRepository,
-    RegistrationRepository,
     TournamentRepository,
 )
 from app.schemas.prediction import PredictResponse
@@ -45,7 +44,7 @@ class AuditRead(BaseModel):
 
 @audit_router.get("", response_model=list[AuditRead], summary="Журнал аудита")
 async def list_audit(
-    _: Annotated[User, Depends(require_roles(UserRoleName.admin, UserRoleName.manager))],
+    _: Annotated[User, Depends(require_roles(UserRole.admin, UserRole.manager))],
     session: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -65,27 +64,24 @@ async def list_audit(
     "/generate",
     response_model=QRGenerateResponse,
     summary="Сгенерировать QR-токен",
-    description="Токен для прохода. Участник — только для своих регистраций, персонал — для любых.",
+    description=(
+        "Токен для прохода."
+    ),
 )
 async def generate_qr(
     user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
-    registration_id: int = Query(...),
+    tournament_id: int = Query(..., description="Турнир, в котором вы участвуете"),
 ) -> QRGenerateResponse:
-    registration_repository = RegistrationRepository(session)
     participant_repository = ParticipantRepository(session)
-    registration = await registration_repository.get_by_id(registration_id)
-    if not registration:
+    participant = await participant_repository.get_by_user_tournament(user.id, tournament_id)
+    if not participant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    if user.role.name not in (UserRoleName.admin.value, UserRoleName.organizer.value):
-        my_participant = await participant_repository.get_by_user_id(user.id)
-        if not my_participant or registration.participant_id != my_participant.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
     now = datetime.now(UTC)
     expires = now + timedelta(seconds=settings.qr_token_ttl_seconds)
     token = uuid4().hex + uuid4().hex
     qr_session = QRSession(
-        registration_id=registration_id, token=token, expires_at=expires, used=False
+        participant_id=participant.id, token=token, expires_at=expires, used=False
     )
     session.add(qr_session)
     await session.flush()
@@ -107,23 +103,22 @@ async def generate_qr(
     description="Создаёт запись AttendanceLog.",
 )
 async def validate_qr(
-    user: Annotated[User, Depends(require_roles(UserRoleName.admin, UserRoleName.organizer))],
+    user: Annotated[User, Depends(require_roles(UserRole.admin, UserRole.organizer))],
     body: QRValidateRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> QRValidateResponse:
     qr_repository = QRRepository(session)
-    registration_repository = RegistrationRepository(session)
+    participant_repository = ParticipantRepository(session)
     qr_session = await qr_repository.get_by_token(body.token)
     now = datetime.now(UTC)
     if not qr_session or qr_session.used or qr_session.expires_at <= now:
         return QRValidateResponse(ok=False, message="Invalid or expired token")
-    registration = await registration_repository.get_by_id(qr_session.registration_id)
-    if not registration:
-        return QRValidateResponse(ok=False, message="Registration missing")
+    participant = await participant_repository.get_by_id(qr_session.participant_id)
+    if not participant:
+        return QRValidateResponse(ok=False, message="Participant missing")
     qr_session.used = True
     attendance_log = AttendanceLog(
-        registration_id=registration.id,
-        participant_id=registration.participant_id,
+        participant_id=participant.id,
         qr_session_id=qr_session.id,
     )
     session.add(attendance_log)
@@ -136,12 +131,12 @@ async def validate_qr(
         entity_id=attendance_log.id,
     )
     await session.commit()
-    return QRValidateResponse(ok=True, registration_id=registration.id, message="Checked in")
+    return QRValidateResponse(ok=True, participant_id=participant.id, message="Checked in")
 
 
 PredictUser = Annotated[
     User,
-    Depends(require_roles(UserRoleName.admin, UserRoleName.organizer, UserRoleName.manager)),
+    Depends(require_roles(UserRole.admin, UserRole.organizer, UserRole.manager)),
 ]
 
 
@@ -164,8 +159,8 @@ async def predict(
     if not tournament:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tournament not found")
 
-    registration_repository = RegistrationRepository(session)
-    registered_count = await registration_repository.count_for_tournament(tournament_id)
+    participant_repository = ParticipantRepository(session)
+    registered_count = await participant_repository.count_for_tournament(tournament_id)
     pred, metrics = predict_attendance(
         discipline_name=tournament.discipline.name,
         tournament_type=tournament.tournament_type,

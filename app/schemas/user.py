@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.enums import UserRole
+
 
 class BaseUser(BaseModel):
     login: str
@@ -8,7 +10,7 @@ class BaseUser(BaseModel):
     first_name: str | None
     last_name: str | None
 
-    role_id: int
+    role: UserRole
 
 
 class UserCreate(BaseUser):
@@ -18,10 +20,23 @@ class UserCreate(BaseUser):
     is_active: bool = True
 
 
-class UserUpdate(BaseUser):
+class UserUpdate(BaseModel):
+    """Частичное обновление пользователя (админ)."""
+
     login: str | None = Field(default=None, min_length=3, max_length=128)
-    password: str | None = Field(default=None, min_length=6, max_length=128, description="Пароль")
+    nickname: str | None = Field(default=None, max_length=128)
+    first_name: str | None = Field(default=None, min_length=1, max_length=128)
+    last_name: str | None = Field(default=None, min_length=1, max_length=128)
+    role: UserRole | None = None
     is_active: bool | None = None
+
+
+class ProfileUpdate(BaseModel):
+    """Профиль текущего пользователя (без смены логина и роли)."""
+
+    nickname: str | None = Field(default=None, max_length=128)
+    first_name: str | None = Field(default=None, min_length=1, max_length=128)
+    last_name: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class UserRead(BaseUser):

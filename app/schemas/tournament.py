@@ -47,5 +47,5 @@ class TournamentRead(BaseModel):
     prize_pool: Decimal
     max_participants: int
     status: str
-    created_by_user_id: int | None = None
     created_at: datetime | None = None
+    created_by_user_id: int | None = None

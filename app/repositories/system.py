@@ -38,12 +38,12 @@ class QRRepository(BaseRepository):
         result = await self.session.execute(select(QRSession).where(QRSession.token == token))
         return result.scalar_one_or_none()
 
-    async def get_active_for_registration(self, registration_id: int) -> QRSession | None:
+    async def get_active_for_participant(self, participant_id: int) -> QRSession | None:
         now = datetime.now(UTC)
         result = await self.session.execute(
             select(QRSession)
             .where(
-                QRSession.registration_id == registration_id,
+                QRSession.participant_id == participant_id,
                 QRSession.used.is_(False),
                 QRSession.expires_at > now,
             )

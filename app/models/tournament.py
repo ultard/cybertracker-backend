@@ -18,13 +18,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.db.base import Base
-from app.models.enums import RegistrationStatus, TournamentStatus, TournamentType
+from app.models.enums import ParticipantRole, ParticipantStatus, TournamentStatus, TournamentType
 
 _json_type = JSON().with_variant(JSONB, "postgresql")
 
 if TYPE_CHECKING:
+    from app.models.auth import User
     from app.models.discipline import Discipline
-    from app.models.participant import Participant
     from app.models.system import AttendanceLog, QRSession
 
 
@@ -56,21 +56,19 @@ class Tournament(Base):
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
     discipline: Mapped[Discipline] = relationship(back_populates="tournaments")
-    registrations: Mapped[list[Registration]] = relationship(back_populates="tournament")
+    participants: Mapped[list[Participant]] = relationship(back_populates="tournament")
     match_results: Mapped[list[MatchResult]] = relationship(back_populates="tournament")
     predictions: Mapped[list[AttendancePrediction]] = relationship(back_populates="tournament")
 
 
-class Registration(Base):
-    __tablename__ = "registrations"
+class Participant(Base):
+    __tablename__ = "participants"
     __table_args__ = (
-        UniqueConstraint("participant_id", "tournament_id", name="uq_reg_participant_tournament"),
+        UniqueConstraint("user_id", "tournament_id", name="uq_participant_user_tournament"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    participant_id: Mapped[int] = mapped_column(
-        ForeignKey("participants.id", ondelete="CASCADE"), index=True
-    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     tournament_id: Mapped[int] = mapped_column(
         ForeignKey("tournaments.id", ondelete="CASCADE"), index=True
     )
@@ -78,13 +76,22 @@ class Registration(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     status: Mapped[str] = mapped_column(
-        String(32), default=RegistrationStatus.pending.value, nullable=False, index=True
+        String(32), default=ParticipantStatus.pending.value, nullable=False, index=True
+    )
+    participant_role: Mapped[str] = mapped_column(
+        String(32), default=ParticipantRole.player.value, nullable=False, index=True
     )
 
-    participant: Mapped[Participant] = relationship(back_populates="registrations")
-    tournament: Mapped[Tournament] = relationship(back_populates="registrations")
-    qr_sessions: Mapped[list[QRSession]] = relationship(back_populates="registration")
-    attendance_logs: Mapped[list[AttendanceLog]] = relationship(back_populates="registration")
+    user: Mapped[User] = relationship(lazy="joined")
+    tournament: Mapped[Tournament] = relationship(back_populates="participants")
+    qr_sessions: Mapped[list[QRSession]] = relationship(
+        back_populates="participant",
+        cascade="all, delete-orphan",
+    )
+    attendance_logs: Mapped[list[AttendanceLog]] = relationship(
+        back_populates="participant",
+        cascade="all, delete-orphan",
+    )
 
 
 class MatchResult(Base):
@@ -97,26 +104,27 @@ class MatchResult(Base):
     played_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
-    winner_registration_id: Mapped[int | None] = mapped_column(
-        ForeignKey("registrations.id", ondelete="SET NULL"), nullable=True
+    winner_participant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("participants.id", ondelete="SET NULL"), nullable=True
     )
-    participant_a_registration_id: Mapped[int | None] = mapped_column(
-        ForeignKey("registrations.id", ondelete="SET NULL"), nullable=True
+    participant_a_id: Mapped[int | None] = mapped_column(
+        ForeignKey("participants.id", ondelete="SET NULL"), nullable=True
     )
-    participant_b_registration_id: Mapped[int | None] = mapped_column(
-        ForeignKey("registrations.id", ondelete="SET NULL"), nullable=True
+    participant_b_id: Mapped[int | None] = mapped_column(
+        ForeignKey("participants.id", ondelete="SET NULL"), nullable=True
     )
     score: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    comment: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     tournament: Mapped[Tournament] = relationship(back_populates="match_results")
-    winner_registration: Mapped[Registration | None] = relationship(
-        "Registration", foreign_keys=[winner_registration_id]
+    winner_participant: Mapped[Participant | None] = relationship(
+        "Participant", foreign_keys=[winner_participant_id]
     )
-    participant_a: Mapped[Registration | None] = relationship(
-        "Registration", foreign_keys=[participant_a_registration_id]
+    participant_a: Mapped[Participant | None] = relationship(
+        "Participant", foreign_keys=[participant_a_id]
     )
-    participant_b: Mapped[Registration | None] = relationship(
-        "Registration", foreign_keys=[participant_b_registration_id]
+    participant_b: Mapped[Participant | None] = relationship(
+        "Participant", foreign_keys=[participant_b_id]
     )
 
 

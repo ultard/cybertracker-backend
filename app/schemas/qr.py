@@ -14,5 +14,5 @@ class QRValidateRequest(BaseModel):
 
 class QRValidateResponse(BaseModel):
     ok: bool
-    registration_id: int | None = None
+    participant_id: int | None = None
     message: str

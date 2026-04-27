@@ -4,23 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_service import write_audit
-from app.core.security import hash_password
-from app.deps import get_db, require_roles
+from app.deps import get_current_user, get_db, require_roles
 from app.models import User
-from app.models.enums import UserRoleName
-from app.repositories import RoleRepository, UserRepository
+from app.models.enums import UserRole
+from app.repositories import UserRepository
 from app.schemas.common import Page
-from app.schemas.role import RoleRead
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import ProfileUpdate, UserRead, UserUpdate
 
 users_router = APIRouter()
-roles_router = APIRouter()
 
-AdminUser = Annotated[User, Depends(require_roles(UserRoleName.admin))]
-Staff = Annotated[
-    User,
-    Depends(require_roles(UserRoleName.admin, UserRoleName.organizer, UserRoleName.manager)),
-]
+AdminUser = Annotated[User, Depends(require_roles(UserRole.admin))]
 
 
 def _read_user(user: User) -> UserRead:
@@ -31,7 +24,7 @@ def _read_user(user: User) -> UserRead:
         first_name=user.first_name,
         last_name=user.last_name,
         is_active=user.is_active,
-        role_id=user.role_id,
+        role=UserRole(user.role),
     )
 
 
@@ -42,12 +35,16 @@ async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=200),
     login: str | None = None,
-    role_id: int | None = None,
+    role: UserRole | None = None,
     is_active: bool | None = None,
 ) -> Page[UserRead]:
     user_repository = UserRepository(session)
     rows, total = await user_repository.list_users(
-        skip=skip, limit=limit, login_filter=login, role_id=role_id, is_active=is_active
+        skip=skip,
+        limit=limit,
+        login_filter=login,
+        role=role.value if role is not None else None,
+        is_active=is_active,
     )
     return Page(
         items=[_read_user(user) for user in rows],
@@ -57,44 +54,25 @@ async def list_users(
     )
 
 
-@users_router.post(
-    "",
-    response_model=UserRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создать пользователя",
-    description="Логин и role_id обязательны.",
-)
-async def create_user(
-    _: AdminUser,
-    data: UserCreate,
+@users_router.get("/me", response_model=UserRead, summary="Текущий пользователь")
+async def get_me(user: Annotated[User, Depends(get_current_user)]) -> UserRead:
+    return _read_user(user)
+
+
+@users_router.patch("/me", response_model=UserRead, summary="Обновить свой профиль")
+async def update_my_profile(
+    user: Annotated[User, Depends(get_current_user)],
+    data: ProfileUpdate,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserRead:
-    user_repository = UserRepository(session)
-    role_repository = RoleRepository(session)
-
-    if await user_repository.get_by_login(data.login):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login exists")
-
-    if not await role_repository.get_by_id(data.role_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role_id")
-
-    user = User(
-        login=data.login,
-        password_hash=hash_password(data.password),
-        is_active=data.is_active,
-        role_id=data.role_id,
-        nickname=data.nickname,
-        first_name=data.first_name or "",
-        last_name=data.last_name or "",
-        phone=data.phone,
-        email=data.email,
-    )
-    session.add(user)
-    await session.flush()
-    await write_audit(session, user_id=_.id, action="user.create", entity="User", entity_id=user.id)
+    if data.nickname is not None:
+        user.nickname = data.nickname
+    if data.first_name is not None:
+        user.first_name = data.first_name
+    if data.last_name is not None:
+        user.last_name = data.last_name
     await session.commit()
-    user = await user_repository.get_by_id(user.id)
-    assert user
+    await session.refresh(user)
     return _read_user(user)
 
 
@@ -121,7 +99,6 @@ async def update_user(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserRead:
     user_repository = UserRepository(session)
-    role_repository = RoleRepository(session)
     found_user = await user_repository.get_by_id(user_id)
     if not found_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -133,17 +110,20 @@ async def update_user(
     ):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Login exists")
 
-    if data.role_id is not None and not await role_repository.get_by_id(data.role_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role_id")
-
     if data.login is not None:
         found_user.login = data.login
 
-    if data.password is not None:
-        found_user.password_hash = hash_password(data.password)
+    if data.nickname is not None:
+        found_user.nickname = data.nickname
 
-    if data.role_id is not None:
-        found_user.role_id = data.role_id
+    if data.first_name is not None:
+        found_user.first_name = data.first_name
+
+    if data.last_name is not None:
+        found_user.last_name = data.last_name
+
+    if data.role is not None:
+        found_user.role = data.role.value
 
     if data.is_active is not None:
         found_user.is_active = data.is_active
@@ -180,11 +160,4 @@ async def delete_user(
     await session.commit()
 
 
-@roles_router.get("", response_model=list[RoleRead], summary="Список ролей")
-async def list_roles(
-    _: Staff,
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> list[RoleRead]:
-    role_repository = RoleRepository(session)
-    roles = await role_repository.list_all()
-    return [RoleRead.model_validate(role) for role in roles]
+__all__ = ["users_router"]

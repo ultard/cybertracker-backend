@@ -12,8 +12,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.auth import User
-    from app.models.participant import Participant
-    from app.models.tournament import Registration
+    from app.models.tournament import Participant
 
 _json_type = JSON().with_variant(JSONB, "postgresql")
 
@@ -41,8 +40,8 @@ class QRSession(Base):
     __tablename__ = "qr_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    registration_id: Mapped[int] = mapped_column(
-        ForeignKey("registrations.id", ondelete="CASCADE"), index=True
+    participant_id: Mapped[int] = mapped_column(
+        ForeignKey("participants.id", ondelete="CASCADE"), index=True
     )
     token: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -51,7 +50,7 @@ class QRSession(Base):
     )
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    registration: Mapped[Registration] = relationship(back_populates="qr_sessions")
+    participant: Mapped[Participant] = relationship(back_populates="qr_sessions")
     attendance_logs: Mapped[list[AttendanceLog]] = relationship(back_populates="qr_session")
 
 
@@ -59,9 +58,6 @@ class AttendanceLog(Base):
     __tablename__ = "attendance_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    registration_id: Mapped[int] = mapped_column(
-        ForeignKey("registrations.id", ondelete="CASCADE"), index=True
-    )
     participant_id: Mapped[int] = mapped_column(
         ForeignKey("participants.id", ondelete="CASCADE"), index=True
     )
@@ -72,6 +68,5 @@ class AttendanceLog(Base):
         DateTime(timezone=True), server_default=func.now(), index=True
     )
 
-    registration: Mapped[Registration] = relationship(back_populates="attendance_logs")
     participant: Mapped[Participant] = relationship(back_populates="attendance_logs")
     qr_session: Mapped[QRSession | None] = relationship(back_populates="attendance_logs")
