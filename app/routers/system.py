@@ -64,9 +64,7 @@ async def list_audit(
     "/generate",
     response_model=QRGenerateResponse,
     summary="Сгенерировать QR-токен",
-    description=(
-        "Токен для прохода."
-    ),
+    description=("Токен для прохода."),
 )
 async def generate_qr(
     user: Annotated[User, Depends(get_current_user)],
@@ -144,9 +142,7 @@ PredictUser = Annotated[
     "/tournament/{tournament_id}",
     response_model=PredictResponse,
     summary="Прогноз посещаемости",
-    description=(
-        "Прогноз по турниру"
-    ),
+    description=("Прогноз по турниру"),
 )
 async def predict(
     user: PredictUser,
@@ -196,4 +192,3 @@ async def predict(
         model_metrics=metrics or None,
         recommendations=recs,
     )
-

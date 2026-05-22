@@ -27,4 +27,3 @@ class ParticipantRead(BaseModel):
     status: str
     participant_role: ParticipantRole
     nickname: str | None = None
-

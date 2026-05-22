@@ -120,11 +120,7 @@ def _read_tournament(tournament: Tournament) -> TournamentRead:
     )
 
 
-@tournaments_router.get(
-    "",
-    response_model=Page[TournamentRead],
-    summary="Список турниров"
-)
+@tournaments_router.get("", response_model=Page[TournamentRead], summary="Список турниров")
 async def list_tournaments(
     user: Annotated[User | None, Depends(get_current_user_optional)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -136,9 +132,7 @@ async def list_tournaments(
 ) -> Page[TournamentRead]:
     tournament_repository = TournamentRepository(session)
     visible_statuses = (
-        None
-        if _user_sees_non_public_tournaments(user)
-        else _PUBLIC_TOURNAMENT_STATUSES
+        None if _user_sees_non_public_tournaments(user) else _PUBLIC_TOURNAMENT_STATUSES
     )
     rows, total = await tournament_repository.list_page(
         skip=skip,
@@ -157,10 +151,7 @@ async def list_tournaments(
 
 
 @tournaments_router.post(
-    "", 
-    response_model=TournamentRead,
-    status_code=status.HTTP_201_CREATED,
-    summary="Создать турнир"
+    "", response_model=TournamentRead, status_code=status.HTTP_201_CREATED, summary="Создать турнир"
 )
 async def create_tournament(
     user: Org,
@@ -410,7 +401,7 @@ async def get_participant(
     response_model=ParticipantRead,
     status_code=status.HTTP_201_CREATED,
     summary="Записаться на турнир",
-    description="Текущий пользователь оформляет участие в турнире."
+    description="Текущий пользователь оформляет участие в турнире.",
 )
 async def register_for_tournament(
     user: Annotated[User, Depends(get_current_user)],
@@ -541,11 +532,7 @@ def _read_match(match: MatchResult) -> MatchRead:
     return MatchRead.model_validate(match)
 
 
-@matches_router.get(
-    "",
-    response_model=Page[MatchRead],
-    summary="Список матчей"
-)
+@matches_router.get("", response_model=Page[MatchRead], summary="Список матчей")
 async def list_matches(
     user: Annotated[User | None, Depends(get_current_user_optional)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -668,5 +655,6 @@ async def update_match(
     updated_match = await match_repository.get_by_id(match_id)
     assert updated_match
     return _read_match(updated_match)
+
 
 __all__ = ["tournaments_router", "participants_router", "matches_router"]

@@ -42,7 +42,7 @@ def _issue_token_pair(user: User) -> tuple[TokenResponse, str, datetime]:
             refresh_token=refresh_token,
             token_type="bearer",
             expires_in=settings.access_token_expire_minutes * 60,
-            refresh_expires_in=settings.refresh_token_expire_days * 24 * 60 * 60
+            refresh_expires_in=settings.refresh_token_expire_days * 24 * 60 * 60,
         ),
         refresh_jti_hash(refresh_jti),
         refresh_expires_at,
@@ -158,7 +158,7 @@ async def refresh_tokens(
         )
     try:
         user_id = int(payload["sub"])
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
