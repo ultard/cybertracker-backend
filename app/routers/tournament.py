@@ -22,7 +22,12 @@ from app.repositories import (
 from app.schemas.common import Page
 from app.schemas.match import MatchCreate, MatchRead, MatchUpdate
 from app.schemas.participant import ParticipantRead, ParticipantRegister, ParticipantUpdate
-from app.schemas.tournament import TournamentCreate, TournamentRead, TournamentUpdate
+from app.schemas.tournament import (
+    TournamentCreate,
+    TournamentRead,
+    TournamentUpdate,
+    ensure_tournament_datetime_in_bounds,
+)
 
 tournaments_router = APIRouter()
 
@@ -222,6 +227,8 @@ async def update_tournament(
     tournament = await tournament_repository.get_by_id(tournament_id)
     if not tournament:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    original_start_at = tournament.start_at
+    original_end_at = tournament.end_at
     if data.discipline_id is not None and not await discipline_repository.get_by_id(
         data.discipline_id
     ):
@@ -246,6 +253,15 @@ async def update_tournament(
         tournament.status = data.status.value
     if tournament.end_at <= tournament.start_at:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid dates")
+    try:
+        if tournament.start_at != original_start_at:
+            ensure_tournament_datetime_in_bounds(tournament.start_at)
+        if tournament.end_at != original_end_at:
+            ensure_tournament_datetime_in_bounds(tournament.end_at)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     await write_audit(
         session,
         user_id=user.id,

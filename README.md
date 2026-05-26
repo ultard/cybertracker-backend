@@ -122,3 +122,9 @@ uv run ty check
 ```bash
 uv run ruff format .
 ```
+
+## Тестирование функционала
+
+```bash
+uv run pytest
+```
